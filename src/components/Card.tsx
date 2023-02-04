@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { StarIcon } from "@chakra-ui/icons";
 import { invoke } from "@tauri-apps/api";
+import { OpenAttachedFolderButton } from "./OpenAttachedFolderButton";
 
 type Props = {
   userId: number;
@@ -90,6 +91,7 @@ export const DataCard: React.FC<Props> = ({ userId, card }) => {
               "未読"
             </Text>
           )}
+          <OpenAttachedFolderButton card_id={card.id} />
           <IconButton
             size="md"
             fontSize="2xl"
