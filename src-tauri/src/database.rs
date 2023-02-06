@@ -5,7 +5,50 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     Row, SqlitePool,
 };
-use crate::{Card};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct User {
+  id: i64,
+  name: String,
+}
+
+impl User {
+  pub fn new(id: i64, name: &str) -> Self {
+      User {
+          id,
+          name: name.to_string(),
+      }
+  }
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Card {
+  id: i64,
+  content: String,
+  pic_id: i64,
+  updated: String,
+  created: String,
+  unread: bool,
+  starred: bool,
+}
+
+impl Card {
+  pub fn new(id: i64, content: &str, pic_id:i64,updated: &str, created: &str,unread:i64, starred:i64) -> Self {
+      Card {
+          id,
+          content: content.to_string(),
+          pic_id,
+          updated: updated.to_string(),
+          created: created.to_string(),
+          unread: if unread == 1 {true} else {false},
+          starred: if starred == 1 {true} else {false},
+      }
+  }
+}
+
+
 
 type DbResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -22,128 +65,96 @@ pub(crate) async fn create_sqlite_pool(database_url: &str) -> DbResult<SqlitePoo
     Ok(sqlite_pool)
 }
 
-/// マイグレーションを行う
 pub(crate) async fn migrate_database(pool: &SqlitePool) -> DbResult<()> {
-    sqlx::migrate!("./db").run(pool).await?;
+    sqlx::migrate!("./db/migrations").run(pool).await?;
     Ok(())
 }
 
 pub(crate) async fn get_cards(pool: &SqlitePool, user_id : i64) -> DbResult<Vec<Card>> {
-  let sql1:String = format!("SELECT
-                              card.id
-                              , card.content
-                              , card.updated
-                              , card.created
-                              , ifnull(unread_user.unread_flag, 0) AS unread
-                              , ifnull(star_user.stared_flag, 0) AS stared
-                            FROM
-                              card
-                              LEFT JOIN (
-                                  SELECT
-                                      unread_card.card_id
-                                      , 1 AS unread_flag
-                                  FROM
-                                      unread_card
-                                  WHERE
-                                      unread_card.user_id = {user_id}
-                              ) unread_user
-                                  ON card.id = unread_user.card_id
-                              LEFT JOIN (
-                                  SELECT
-                                      star_card.card_id
-                                      , 1 AS stared_flag
-                                  FROM
-                                      star_card
-                                  WHERE
-                                      star_card.user_id = {user_id}
-                              ) star_user
-                                  ON card.id = star_user.card_id
-                            ORDER BY
-                              card.updated DESC;
-                            ");
+  let sql = std::fs::read_to_string("./db/user/get_cards.sql")?;
 
-  let mut rows = sqlx::query(&sql1).fetch(pool);
+  let mut rows = sqlx::query(&sql)
+    .bind(user_id)
+    .bind(user_id)
+    .fetch(pool);
 
   let mut cards = BTreeMap::new();
   while let Some(row) = rows.try_next().await? {
-      let id: i64 = row.try_get("id")?;
-      let content: &str = row.try_get("content")?;
-      let updated: &str = row.try_get("updated")?;
-      let created: &str = row.try_get("created")?;
-      let unread: i64 = row.try_get("unread")?;
-      let stared: i64 = row.try_get("stared")?;
-      cards.insert(id, Card::new(
-        id, content, updated, created, unread, stared
-      ));
+    let id: i64 = row.try_get("id")?;
+    let content: &str = row.try_get("content")?;
+    let pic_id: i64 = row.try_get("pic_id")?;
+    let updated: &str = row.try_get("updated")?;
+    let created: &str = row.try_get("created")?;
+    let unread: i64 = row.try_get("unread")?;
+    let starred: i64 = row.try_get("starred")?;
+    cards.insert(id, Card::new(
+      id, content, pic_id, updated, created, unread, starred
+    ));
   }
 
   Ok(cards.into_iter().map(|(_k, v)| v).collect())
 }
-pub(crate) async fn get_username(pool: &SqlitePool, user_id : i64) -> DbResult<String> {
-  let sql1:String = format!("SELECT
-                            name
-                          FROM
-                            user
-                          WHERE
-                            id = {user_id}
-                      ");
 
-  let row = sqlx::query(&sql1).fetch_one(pool).await?;
+pub(crate) async fn get_username(pool: &SqlitePool, user_id : i64) -> DbResult<String> {
+  let sql = std::fs::read_to_string("./db/user/get_name.sql")?;
+
+  let row = sqlx::query(&sql)
+    .bind(user_id)
+    .fetch_one(pool).await?;
+
   let name: &str = row.try_get("name")?;
 
   Ok(name.to_string())
 }
+pub(crate) async fn get_users(pool: &SqlitePool) -> DbResult<Vec<User>> {
+  let sql = std::fs::read_to_string("./db/user/get_all_user.sql")?;
 
-pub(crate) async fn insert_star_flag(pool: &SqlitePool, card_id: i64, user_id: i64) -> DbResult<()> {
+  let mut rows = sqlx::query(&sql)
+    .fetch(pool);
+
+  let mut users = BTreeMap::new();
+  while let Some(row) = rows.try_next().await? {
+    let id: i64 = row.try_get("id")?;
+    let name: &str = row.try_get("name")?;
+    users.insert(id, User::new(id, name));
+  }
+
+  Ok(users.into_iter().map(|(_k, v)| v).collect())
+}
+
+
+pub(crate) async fn manage_flags(
+  pool: &SqlitePool,
+  table:&str,
+  method:&str,
+  card_id: i64,
+  user_id: i64
+)-> DbResult<()> {
   let mut tx = pool.begin().await?;
+  let sql = std::fs::read_to_string(format!("./db/{table}/{method}.sql"))?;
 
-  sqlx::query("INSERT INTO star_card (card_id, user_id) VALUES (?, ?)")
-      .bind(card_id)
-      .bind(user_id)
-      .execute(&mut tx)
-      .await?;
+  sqlx::query(&sql)
+    .bind(card_id)
+    .bind(user_id)
+    .execute(&mut tx)
+    .await?;
 
   tx.commit().await?;
 
   Ok(())
 }
 
-pub(crate) async fn delete_star_flag(pool: &SqlitePool, card_id: i64, user_id: i64) -> DbResult<()> {
+pub(crate) async fn delete_all_unread_flags(
+  pool: &SqlitePool,
+  user_id: i64
+)-> DbResult<()> {
   let mut tx = pool.begin().await?;
+  let sql = std::fs::read_to_string(format!("./db/unread_card/delete_all.sql"))?;
 
-  sqlx::query("DELETE FROM star_card WHERE card_id = ? AND user_id = ?")
-      .bind(card_id)
-      .bind(user_id)
-      .execute(&mut tx)
-      .await?;
-
-  tx.commit().await?;
-
-  Ok(())
-}
-
-pub(crate) async fn insert_unread_flag(pool: &SqlitePool, card_id: i64, user_id: i64) -> DbResult<()> {
-  let mut tx = pool.begin().await?;
-
-  sqlx::query("INSERT INTO unread_card (card_id, user_id) VALUES (?, ?)")
-      .bind(card_id)
-      .bind(user_id)
-      .execute(&mut tx)
-      .await?;
-
-  tx.commit().await?;
-
-  Ok(())
-}
-
-pub(crate) async fn delete_unread_flag(pool: &SqlitePool, card_id: i64, user_id: i64) -> DbResult<()> {
-  let mut tx = pool.begin().await?;
-
-  sqlx::query("DELETE FROM unread_card WHERE card_id = ? AND user_id = ?")
-      .bind(card_id)
-      .bind(user_id)
-      .execute(&mut tx)
-      .await?;
+  sqlx::query(&sql)
+    .bind(user_id)
+    .execute(&mut tx)
+    .await?;
 
   tx.commit().await?;
 

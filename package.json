@@ -16,9 +16,12 @@
     "@emotion/styled": "^11.10.5",
     "@tauri-apps/api": "^1.2.0",
     "framer-motion": "^8.1.4",
+    "moment": "^2.29.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-table": "^7.8.0"
+    "react-hook-form": "^7.43.1",
+    "react-table": "^7.8.0",
+    "react-textarea-autosize": "^8.4.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.2",

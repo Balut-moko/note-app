@@ -1,18 +1,24 @@
-export type TNote = {
-  userId: number;
-  cards: TCard[];
-};
+export interface formData {
+  content: string;
+  pic_id: string;
+  updated: string;
+}
 
-export type TInvokeNote = {
-  user_id: number;
-  cards: TCard[];
+export interface UserNames {
+  [user_id: number]: string;
+}
+
+export type TUser = {
+  readonly id: number;
+  readonly name: string;
 };
 
 export type TCard = {
-  id: number;
+  readonly id: number;
   content: string;
+  pic_id: number;
   updated: string;
-  created: string;
-  unread: number;
-  stared: number;
+  readonly created: string;
+  unread: boolean;
+  starred: boolean;
 };

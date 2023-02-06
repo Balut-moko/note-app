@@ -5,46 +5,17 @@
 
 use std::process::Command;
 
-use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
+use crate::database::{Card, User};
 
 pub(crate) mod database;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Note {
-  user_id: i64,
-  cards: Vec<Card>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Card {
-  id: i64,
-  content: String,
-  updated: String,
-  created: String,
-  unread: i64,
-  stared: i64,
-}
-
-impl Card {
-  pub fn new(id: i64, content: &str, updated: &str, created: &str,unread:i64, stared:i64) -> Self {
-      Card {
-          id,
-          content: content.to_string(),
-          updated: updated.to_string(),
-          created: created.to_string(),
-          unread: unread,
-          stared: stared,
-      }
-  }
-}
-
 #[tauri::command]
-async fn get_note(sqlite_pool: State<'_, sqlx::SqlitePool>, user_id:i64) -> Result<Note, String> {
+async fn get_cards(sqlite_pool: State<'_, sqlx::SqlitePool>, user_id:i64) -> Result<Vec<Card>, String> {
   let cards = database::get_cards(&*sqlite_pool, user_id)
       .await
       .map_err(|e| e.to_string())?;
-  Ok(Note { user_id, cards })
+  Ok( cards )
 }
 
 #[tauri::command]
@@ -56,38 +27,37 @@ async fn get_user_name(sqlite_pool: State<'_, sqlx::SqlitePool>, user_id:i64) ->
 }
 
 #[tauri::command]
-async fn handle_star_flag(
+async fn get_users(sqlite_pool: State<'_, sqlx::SqlitePool>) -> Result<Vec<User>, String> {
+  let users = database::get_users(&*sqlite_pool)
+      .await
+      .map_err(|e| e.to_string())?;
+  Ok(users)
+}
+
+#[tauri::command]
+async fn handle_flags(
   sqlite_pool: State<'_, sqlx::SqlitePool>,
+  table:&str,
+  method:&str,
   card_id: i64,
   user_id: i64,
-  star_flag:bool
-) -> Result<(), String> {if star_flag {
-  database::delete_star_flag(&*sqlite_pool, card_id, user_id)
+) -> Result<(), String> {
+  database::manage_flags(&*sqlite_pool, table, method, card_id, user_id)
   .await
-  .map_err(|e| e.to_string())?;
-} else {
-  database::insert_star_flag(&*sqlite_pool, card_id, user_id)
-  .await
-  .map_err(|e| e.to_string())?;
-  }
+  .map_err(|e| e.to_string() )?;
+
   Ok(())
 }
 
 #[tauri::command]
-async fn handle_unread_flag(
+async fn handle_delete_all_unread_flags(
   sqlite_pool: State<'_, sqlx::SqlitePool>,
-  card_id: i64,
   user_id: i64,
-  unread_flag:bool
-) -> Result<(), String> {if unread_flag {
-  database::delete_unread_flag(&*sqlite_pool, card_id, user_id)
+) -> Result<(), String> {
+  database::delete_all_unread_flags(&*sqlite_pool,  user_id)
   .await
   .map_err(|e| e.to_string() )?;
-} else {
-  database::insert_unread_flag(&*sqlite_pool, card_id, user_id)
-  .await
-  .map_err(|e| e.to_string())?;
-  }
+
   Ok(())
 }
 
@@ -143,10 +113,11 @@ fn show_in_folder(mut path: String, card_id:i64) {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   tauri::Builder::default()
   .invoke_handler(tauri::generate_handler![
-    get_note,
+    get_cards,
     get_user_name,
-    handle_star_flag,
-    handle_unread_flag,
+    get_users,
+    handle_flags,
+    handle_delete_all_unread_flags,
     show_in_folder
   ])
   // ハンドラからコネクションプールにアクセスできるよう、登録する
@@ -166,7 +137,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_dir_str = dunce::canonicalize(&database_dir)
     .unwrap()
     .to_string_lossy()
-    .replace('\\', "/");
+    .replace('\\', "/")
+    .replace("//?/UNC/", "//");
     let database_url = format!("sqlite://{}/{}", database_dir_str, DATABASE_FILE);
     let sqlite_pool = block_on(database::create_sqlite_pool(&database_url))?;
 
