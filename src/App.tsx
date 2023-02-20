@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api";
 import { useForm } from "react-hook-form";
 
@@ -33,8 +33,6 @@ import {
   Spacer,
   Stack,
   Text,
-  Textarea,
-  TextareaProps,
   useDisclosure,
 } from "@chakra-ui/react";
 import {
@@ -46,41 +44,14 @@ import {
   StarIcon,
 } from "@chakra-ui/icons";
 
-import ResizeTextarea from "react-textarea-autosize";
-import moment from "moment";
+import { OpenAttachedFolderButton } from "./components/OpenAttachedFolderButton";
+import { AutoResizeTextarea } from "./components/AutoResizeTextarea";
+import { formatDate } from "./utils/formatDate";
+
 import * as user from "./types/user";
 
 type ReadFilter = "all" | "read" | "unread" | "None";
 type StarFilter = "all" | "starred" | "unStarred" | "None";
-
-export const AutoResizeTextarea = forwardRef<
-  HTMLTextAreaElement,
-  TextareaProps
->((props, ref) => {
-  return (
-    <Textarea
-      minH="unset"
-      overflow="hidden"
-      w="100%"
-      resize="none"
-      ref={ref}
-      minRows={3}
-      as={ResizeTextarea}
-      {...props}
-    />
-  );
-});
-
-const formatDate = (date: Date, format: string) => {
-  format = format.replace(/yyyy/g, date.getFullYear().toString());
-  format = format.replace(/MM/g, ("0" + (date.getMonth() + 1)).slice(-2));
-  format = format.replace(/dd/g, ("0" + date.getDate()).slice(-2));
-  format = format.replace(/HH/g, ("0" + date.getHours()).slice(-2));
-  format = format.replace(/mm/g, ("0" + date.getMinutes()).slice(-2));
-  format = format.replace(/ss/g, ("0" + date.getSeconds()).slice(-2));
-  format = format.replace(/SSS/g, ("00" + date.getMilliseconds()).slice(-3));
-  return format;
-};
 
 export const App = () => {
   const [formText, setFormText] = useState("");
@@ -96,49 +67,7 @@ export const App = () => {
   const [cards, setCards] = useState<user.TCard[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const [contentText, setContentText] = useState("");
   const [editCard, setEditCard] = useState<user.TCard | null>(null);
-
-  const {
-    handleSubmit,
-    register,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<user.formData>();
-
-  const onSubmit = (data: user.formData) => {
-    console.log(data);
-    if (editCard) {
-      const newCard = {
-        ...editCard,
-        content: data.content,
-        updated: formatDate(new Date(data.updated), "yyyy-MM-dd HH:mm:ss"),
-        unread: true,
-      };
-
-      const newCards = [...cards].filter((card) => {
-        if (card.id === newCard.id) {
-          return false;
-        }
-        return card;
-      });
-      setCards([newCard, ...newCards]);
-    } else {
-      // todo get last row id
-
-      const newCard: user.TCard = {
-        id: new Date().getTime(),
-        content: data.content,
-        pic_id: Number(data.pic_id),
-        updated: formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
-        created: formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
-        unread: true,
-        starred: false,
-      };
-      setCards([newCard, ...cards]);
-    }
-    onClose();
-  };
 
   useEffect(() => {
     (async () => {
@@ -182,6 +111,57 @@ export const App = () => {
     })();
   }, [userId]);
 
+  const {
+    handleSubmit,
+    register,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<user.formData>();
+
+  const handleOpenModal = (card: user.TCard | null) => {
+    setValue("card_id", card ? card.id : null);
+    setValue("content", card ? card.content : "");
+    setValue("updated", formatDate(new Date(), "yyyy-MM-dd HH:mm"));
+    onOpen();
+  };
+
+  const onSubmit = (data: user.formData) => {
+    console.log(data);
+    if (data.card_id) {
+      // update
+      (async () => {
+        const updateCard = await invoke<user.TCard>("handle_update_card", {
+          userId: userId,
+          cardId: data.card_id,
+          content: data.content,
+          picId: Number(data.pic_id),
+          updated: data.updated,
+        }).catch((err) => {
+          console.error(err);
+          return null;
+        });
+        if (!!updateCard) {
+          const newCards = cards.filter((card) => card.id !== updateCard.id);
+          setCards([updateCard, ...newCards]);
+        }
+      })();
+    } else {
+      // new create
+      (async () => {
+        const newCard = await invoke<user.TCard>("handle_insert_card", {
+          userId: userId,
+          content: data.content,
+          picId: Number(data.pic_id),
+        }).catch((err) => {
+          console.error(err);
+          return null;
+        });
+        if (!!newCard) setCards([newCard, ...cards]);
+      })();
+    }
+    onClose();
+  };
+
   const onChangeHandler = (value: string) => {
     const v = value.replace(/[０-９．]/g, (s) =>
       String.fromCharCode(s.charCodeAt(0) - 0xfee0)
@@ -191,13 +171,7 @@ export const App = () => {
     }
   };
 
-  const handleOpenModal = (card: user.TCard | null) => {
-    setEditCard(card);
-    setValue("content", card ? card.content : "");
-    onOpen();
-  };
-
-  const handleAllRead = () => {
+  const handleAllUnreadFlags = () => {
     const deepCopy = cards.map((card) => ({ ...card }));
     const newCards = deepCopy.map((card) => {
       card.unread = false;
@@ -212,7 +186,7 @@ export const App = () => {
     setCards(newCards);
   };
 
-  const handleUnread = (id: number, unread: boolean) => {
+  const handleUnreadFlag = (id: number, unread: boolean) => {
     const deepCopy = cards.map((card) => ({ ...card }));
     const newCards = deepCopy.map((card) => {
       if (card.id === id) {
@@ -232,7 +206,7 @@ export const App = () => {
     setCards(newCards);
   };
 
-  const handleStar = (id: number, starred: boolean) => {
+  const handleStarFlag = (id: number, starred: boolean) => {
     const deepCopy = cards.map((card) => ({ ...card }));
     const newCards = deepCopy.map((card) => {
       if (card.id === id) {
@@ -382,7 +356,7 @@ export const App = () => {
               rightIcon={<CheckIcon />}
               colorScheme="teal"
               variant="solid"
-              onClick={() => handleAllRead()}
+              onClick={() => handleAllUnreadFlags()}
             >
               一括既読
             </Button>
@@ -394,25 +368,29 @@ export const App = () => {
               <Card bgColor="gray.100" key={card.id}>
                 <CardHeader padding="2">
                   <Flex flex="1" alignItems="stretch" flexWrap="wrap">
-                    <IconButton
-                      size="md"
-                      fontSize="2xl"
-                      variant="ghost"
-                      color={card.starred ? "yellow.500" : "gray.300"}
-                      aria-label="update_card"
-                      icon={<StarIcon />}
-                      onClick={() => handleStar(card.id, card.starred)}
-                    />
-                    <Button
-                      padding="2"
-                      textColor={card.unread ? "red.500" : "gray.400"}
-                      onClick={() => handleUnread(card.id, card.unread)}
-                    >
-                      {card.unread ? "未読" : "既読"}
-                    </Button>{" "}
                     <Heading size="xs" padding="3">
                       {formatDate(new Date(card.updated), "yyyy-MM-dd")}
                     </Heading>
+                    {userId == 0 ? null : (
+                      <IconButton
+                        size="md"
+                        fontSize="2xl"
+                        variant="ghost"
+                        color={card.starred ? "yellow.500" : "gray.300"}
+                        aria-label="update_card"
+                        icon={<StarIcon />}
+                        onClick={() => handleStarFlag(card.id, card.starred)}
+                      />
+                    )}
+                    {userId == 0 ? null : (
+                      <Button
+                        padding="2"
+                        textColor={card.unread ? "red.500" : "gray.400"}
+                        onClick={() => handleUnreadFlag(card.id, card.unread)}
+                      >
+                        {card.unread ? "未読" : "既読"}
+                      </Button>
+                    )}
                     <Spacer />
                     <IconButton
                       size="md"
@@ -424,7 +402,7 @@ export const App = () => {
                         handleOpenModal(card);
                       }}
                     />
-                    {/* <OpenAttachedFolderButton card_id={card.id} /> */}
+                    <OpenAttachedFolderButton card_id={card.id} />
                   </Flex>
                 </CardHeader>
                 <CardBody padding="2">
@@ -446,12 +424,17 @@ export const App = () => {
         <ModalOverlay />
         <ModalContent>
           <form onSubmit={handleSubmit(onSubmit)}>
+            <input type="hidden" id="card_id" {...register("card_id")} />
             <ModalHeader>Create Card</ModalHeader>
             <ModalCloseButton />
             <ModalBody boxSize="-moz-fit-content" pb={6}>
               <FormControl>
                 <FormLabel htmlFor="pic_id">発言者</FormLabel>
-                <Select {...register("pic_id")}>
+                <Select
+                  borderColor="teal.500"
+                  focusBorderColor="teal.500"
+                  {...register("pic_id")}
+                >
                   {users.map((user) => {
                     return (
                       <option key={user.id} value={user.id}>
@@ -468,7 +451,6 @@ export const App = () => {
                   borderColor="teal.500"
                   focusBorderColor="teal.500"
                   size="lg"
-                  defaultValue={contentText}
                   {...register("content", {
                     required: "This is required",
                   })}
@@ -481,7 +463,8 @@ export const App = () => {
                 <FormLabel>作成・更新日時</FormLabel>
                 <Input
                   type="datetime-local"
-                  defaultValue={formatDate(new Date(), "yyyy-MM-dd HH:mm")}
+                  borderColor="teal.500"
+                  focusBorderColor="teal.500"
                   {...register("updated", {
                     required: "This is required",
                   })}

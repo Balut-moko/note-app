@@ -62,6 +62,36 @@ async fn handle_delete_all_unread_flags(
 }
 
 #[tauri::command]
+async fn handle_insert_card(
+  sqlite_pool: State<'_, sqlx::SqlitePool>,
+  user_id: i64,
+  content: &str,
+  pic_id: i64
+) -> Result<Card, String> {
+  let card = database::insert_card(&*sqlite_pool, user_id, content, pic_id)
+  .await
+  .map_err(|e| e.to_string() )?;
+
+  Ok(card)
+}
+
+#[tauri::command]
+async fn handle_update_card(
+  sqlite_pool: State<'_, sqlx::SqlitePool>,
+  user_id: i64,
+  card_id: i64,
+  content: &str,
+  pic_id: i64,
+  updated: &str,
+) -> Result<Card, String> {
+  let card = database::update_card(&*sqlite_pool, user_id, card_id, content, pic_id, updated)
+  .await
+  .map_err(|e| e.to_string() )?;
+
+  Ok(card)
+}
+
+#[tauri::command]
 fn show_in_folder(mut path: String, card_id:i64) {
   let path2 = std::path::PathBuf::from(&path).join("note-db/attachedFiles").join(card_id.to_string());
   path = path2.to_str().unwrap().to_string();
@@ -118,6 +148,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     get_users,
     handle_flags,
     handle_delete_all_unread_flags,
+    handle_insert_card,
+    handle_update_card,
     show_in_folder
   ])
   // ハンドラからコネクションプールにアクセスできるよう、登録する

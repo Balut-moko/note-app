@@ -78,7 +78,7 @@ pub(crate) async fn get_cards(pool: &SqlitePool, user_id : i64) -> DbResult<Vec<
     .bind(user_id)
     .fetch(pool);
 
-  let mut cards = BTreeMap::new();
+  let mut cards = Vec::new();
   while let Some(row) = rows.try_next().await? {
     let id: i64 = row.try_get("id")?;
     let content: &str = row.try_get("content")?;
@@ -87,12 +87,12 @@ pub(crate) async fn get_cards(pool: &SqlitePool, user_id : i64) -> DbResult<Vec<
     let created: &str = row.try_get("created")?;
     let unread: i64 = row.try_get("unread")?;
     let starred: i64 = row.try_get("starred")?;
-    cards.insert(id, Card::new(
+    cards.push(Card::new(
       id, content, pic_id, updated, created, unread, starred
     ));
   }
 
-  Ok(cards.into_iter().map(|(_k, v)| v).collect())
+  Ok(cards)
 }
 
 pub(crate) async fn get_username(pool: &SqlitePool, user_id : i64) -> DbResult<String> {
@@ -106,6 +106,7 @@ pub(crate) async fn get_username(pool: &SqlitePool, user_id : i64) -> DbResult<S
 
   Ok(name.to_string())
 }
+
 pub(crate) async fn get_users(pool: &SqlitePool) -> DbResult<Vec<User>> {
   let sql = std::fs::read_to_string("./db/user/get_all_user.sql")?;
 
@@ -159,4 +160,81 @@ pub(crate) async fn delete_all_unread_flags(
   tx.commit().await?;
 
   Ok(())
+}
+
+pub(crate) async fn insert_card(pool: &SqlitePool, user_id: i64, content: &str, pic_id: i64) -> DbResult<Card> {
+  let mut tx = pool.begin().await?;
+  let sql1 = std::fs::read_to_string(format!("./db/card/insert.sql"))?;
+
+  let row = sqlx::query(&sql1)
+    .bind(content)
+    .bind(pic_id)
+    .fetch_one(&mut tx)
+    .await?;
+
+    let id: i64 = row.try_get("id")?;
+    let content: &str = row.try_get("content")?;
+    let pic_id: i64 = row.try_get("pic_id")?;
+    let updated: &str = row.try_get("updated")?;
+    let created: &str = row.try_get("created")?;
+    let card = Card::new(
+      id, content, pic_id, updated, created, 0, 0
+    );
+
+    let sql2 = std::fs::read_to_string(format!("./db/unread_card/insert_all_user.sql"))?;
+
+    sqlx::query(&sql2)
+    .bind(card.id)
+    .bind(card.id)
+    .bind(user_id)
+    .execute(&mut tx)
+      .await?;
+
+    tx.commit().await?;
+
+    Ok(card)
+}
+
+pub(crate) async fn update_card(pool: &SqlitePool, user_id: i64, card_id :i64, content:&str, pic_id :i64, updated :&str) -> DbResult<Card> {
+  let mut tx = pool.begin().await?;
+  let sql1 = std::fs::read_to_string(format!("./db/card/update.sql"))?;
+
+  let row = sqlx::query(&sql1)
+    .bind(content)
+    .bind(pic_id)
+    .bind(updated)
+    .bind(card_id)
+    .fetch_one(&mut tx)
+    .await?;
+
+  let id: i64 = row.try_get("id")?;
+  let content: &str = row.try_get("content")?;
+  let pic_id: i64 = row.try_get("pic_id")?;
+  let updated: &str = row.try_get("updated")?;
+  let created: &str = row.try_get("created")?;
+
+  let sql2 = std::fs::read_to_string(format!("./db/star_card/select.sql"))?;
+  let row2 = sqlx::query(&sql2)
+    .bind(card_id)
+    .bind(user_id)
+    .fetch_optional(&mut tx)
+    .await?;
+  let starred:i64 = if row2.is_some() {1} else {0};
+
+  let card = Card::new(
+    id, content, pic_id, updated, created, 0, starred
+  );
+
+  let sql3 = std::fs::read_to_string(format!("./db/unread_card/insert_all_user.sql"))?;
+
+  sqlx::query(&sql3)
+    .bind(card.id)
+    .bind(card.id)
+    .bind(user_id)
+    .execute(&mut tx)
+    .await?;
+
+  tx.commit().await?;
+
+  Ok(card)
 }

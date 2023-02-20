@@ -1,4 +1,5 @@
 export interface formData {
+  card_id: number | null;
   content: string;
   pic_id: string;
   updated: string;
