@@ -67,8 +67,6 @@ export const App = () => {
   const [cards, setCards] = useState<user.TCard[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const [editCard, setEditCard] = useState<user.TCard | null>(null);
-
   useEffect(() => {
     (async () => {
       const users = await invoke<user.TUser[]>("get_users").catch((err) => {

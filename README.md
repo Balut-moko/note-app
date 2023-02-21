@@ -4,9 +4,9 @@ This template should help get you started developing with Tauri, React and Types
 
 ## todo
 
-1. 新規作成ボタンの DB に保存する関数の作成
-1. 編集ボタンの DB に保存する関数の作成
-1. 一括既読ボタンの DB に保存する関数の作成
+## Build
+
+tauri build --target i686-pc-windows-msvc
 
 ## Recommended IDE Setup
 
