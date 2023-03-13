@@ -15,12 +15,19 @@
     "@emotion/react": "^11.10.5",
     "@emotion/styled": "^11.10.5",
     "@tauri-apps/api": "^1.2.0",
+    "@types/react-virtualized": "^9.21.21",
+    "@types/react-virtualized-auto-sizer": "^1.0.1",
+    "@types/react-window": "^1.8.5",
     "framer-motion": "^8.1.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.43.1",
     "react-table": "^7.8.0",
-    "react-textarea-autosize": "^8.4.0"
+    "react-textarea-autosize": "^8.4.0",
+    "react-virtualized": "^9.22.3",
+    "react-virtualized-auto-sizer": "^1.0.7",
+    "react-virtuoso": "^4.1.0",
+    "react-window": "^1.8.8"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.2",
