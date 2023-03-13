@@ -2,11 +2,13 @@
 
 This template should help get you started developing with Tauri, React and Typescript in Vite.
 
+windows only!
+
 ## todo
 
 ## Build
 
-tauri build --target i686-pc-windows-msvc
+yarn tauri build --target i686-pc-windows-msvc
 
 ## Recommended IDE Setup
 

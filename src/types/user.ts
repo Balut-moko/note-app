@@ -23,3 +23,5 @@ export type TCard = {
   unread: boolean;
   starred: boolean;
 };
+export type ReadFilter = "all" | "read" | "unread" | "None";
+export type StarFilter = "all" | "starred" | "unStarred" | "None";

@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   .setup(|app| {
     use tauri::async_runtime::block_on;
 
-    const DATABASE_DIR: &str = "note-db";
+    const DATABASE_DIR: &str = "db";
     const DATABASE_FILE: &str = "db.sqlite";
     let app_resource_dir = tauri::App::path_resolver(&app).resource_dir().unwrap();
     let database_dir = app_resource_dir.join(DATABASE_DIR);

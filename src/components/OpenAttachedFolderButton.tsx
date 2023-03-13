@@ -20,7 +20,7 @@ export const OpenAttachedFolderButton: React.FC<Props> = ({ card_id }) => {
   return (
     <IconButton
       size="md"
-      fontSize="2xl"
+      fontSize="xl"
       variant="ghost"
       colorScheme="teal"
       aria-label="Star note"
