@@ -1,21 +1,9 @@
-import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api";
+import { useEffect, useState } from "react";
 
-import {
-  Box,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Flex,
-  Heading,
-  IconButton,
-  Spacer,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Stack } from "@chakra-ui/react";
 
-import { AddIcon, CheckIcon, EditIcon, StarIcon } from "@chakra-ui/icons";
+import { AddIcon, CheckIcon } from "@chakra-ui/icons";
 import { Virtuoso } from "react-virtuoso";
 
 import * as user from "../types/user";
@@ -35,6 +23,7 @@ export const DataCardList: React.FC<Props> = ({
   searchBoxText,
 }) => {
   const [cards, setCards] = useState<user.TCard[]>([]);
+
   useEffect(() => {
     (async () => {
       const cards = await invoke<user.TCard[]>("get_cards", {
@@ -132,22 +121,8 @@ export const DataCardList: React.FC<Props> = ({
       return card.content.match(searchBoxText);
     });
 
-  const Example = () => (
-    <Virtuoso
-      style={{ height: "calc(100% - 50px)" }}
-      totalCount={filteredCards.length}
-      itemContent={(index: number) => (
-        <DataCard
-          userId={userId}
-          data={filteredCards[index]}
-          handleStarFlag={handleStarFlag}
-          handleUnreadFlag={handleUnreadFlag}
-        />
-      )}
-    />
-  );
   return (
-    <Box borderRadius="sm" height="calc(100% - 150px)">
+    <>
       <Stack height="50px" direction="row" pl="2">
         <Button
           rightIcon={<AddIcon />}
@@ -166,7 +141,18 @@ export const DataCardList: React.FC<Props> = ({
           一括既読
         </Button>
       </Stack>
-      <Example />
-    </Box>
+      <Virtuoso
+        style={{ height: "calc(100% - 50px)" }}
+        totalCount={filteredCards.length}
+        itemContent={(index: number) => (
+          <DataCard
+            userId={userId}
+            data={filteredCards[index]}
+            handleStarFlag={handleStarFlag}
+            handleUnreadFlag={handleUnreadFlag}
+          />
+        )}
+      />
+    </>
   );
 };

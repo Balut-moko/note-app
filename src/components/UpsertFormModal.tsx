@@ -1,3 +1,28 @@
+import {
+  Button,
+  FormControl,
+  FormErrorMessage,
+  FormLabel,
+  Input,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Select,
+  useDisclosure,
+} from "@chakra-ui/react";
+import { invoke } from "@tauri-apps/api";
+import { useEffect, useState } from "react";
+import { AutoResizeTextarea } from "./AutoResizeTextarea";
+import * as user from "../types/user";
+import { useForm } from "react-hook-form";
+import { formatDate } from "../utils/formatDate";
+
+const { isOpen, onOpen, onClose } = useDisclosure();
+
 const {
   handleSubmit,
   register,
@@ -11,7 +36,6 @@ const handleOpenModal = (card: user.TCard | null) => {
   setValue("updated", formatDate(new Date(), "yyyy-MM-dd HH:mm"));
   onOpen();
 };
-
 const onSubmit = (data: user.formData) => {
   console.log(data);
   if (data.card_id) {
@@ -48,72 +72,99 @@ const onSubmit = (data: user.formData) => {
   }
   onClose();
 };
-<Modal size="2xl" isOpen={isOpen} onClose={onClose} closeOnOverlayClick={false}>
-  <ModalOverlay />
-  <ModalContent>
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input type="hidden" id="card_id" {...register("card_id")} />
-      <ModalHeader>Create Card</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody boxSize="-moz-fit-content" pb={6}>
-        <FormControl>
-          <FormLabel htmlFor="pic_id">発言者</FormLabel>
-          <Select
-            borderColor="teal.500"
-            focusBorderColor="teal.500"
-            {...register("pic_id")}
-          >
-            {users.map((user) => {
-              return (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              );
-            })}
-          </Select>
-        </FormControl>
-        <FormControl isInvalid={!!errors.content}>
-          <FormLabel htmlFor="content">発言内容</FormLabel>
-          <AutoResizeTextarea
-            id="content"
-            borderColor="teal.500"
-            focusBorderColor="teal.500"
-            size="lg"
-            {...register("content", {
-              required: "This is required",
-            })}
-          />
-          <FormErrorMessage>
-            {errors.content && errors.content.message}
-          </FormErrorMessage>
-        </FormControl>
-        <FormControl isInvalid={!!errors.updated}>
-          <FormLabel>作成・更新日時</FormLabel>
-          <Input
-            type="datetime-local"
-            borderColor="teal.500"
-            focusBorderColor="teal.500"
-            {...register("updated", {
-              required: "This is required",
-            })}
-          />
-          <FormErrorMessage>
-            {errors.updated && errors.updated.message}
-          </FormErrorMessage>
-        </FormControl>
-      </ModalBody>
 
-      <ModalFooter>
-        <Button
-          colorScheme="teal"
-          mr={3}
-          isLoading={isSubmitting}
-          type="submit"
-        >
-          Save
-        </Button>
-        <Button onClick={onClose}>Cancel</Button>
-      </ModalFooter>
-    </form>
-  </ModalContent>
-</Modal>;
+type Props = {};
+
+export const UpsertFormModal: React.FC<Props> = () => {
+  const [users, setUsers] = useState<user.TUser[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const users = await invoke<user.TUser[]>("get_users").catch((err) => {
+        console.error(err);
+        return [];
+      });
+      const filteredUsers = users.filter((user) => {
+        return user.id != 0;
+      });
+      setUsers(filteredUsers);
+    })();
+  }, []);
+
+  return (
+    <Modal
+      size="2xl"
+      isOpen={isOpen}
+      onClose={onClose}
+      closeOnOverlayClick={false}
+    >
+      <ModalOverlay />
+      <ModalContent>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <input type="hidden" id="card_id" {...register("card_id")} />
+          <ModalHeader>Create Card</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody boxSize="-moz-fit-content" pb={6}>
+            <FormControl>
+              <FormLabel htmlFor="pic_id">発言者</FormLabel>
+              <Select
+                borderColor="teal.500"
+                focusBorderColor="teal.500"
+                {...register("pic_id")}
+              >
+                {users.map((user) => {
+                  return (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  );
+                })}
+              </Select>
+            </FormControl>
+            <FormControl isInvalid={!!errors.content}>
+              <FormLabel htmlFor="content">発言内容</FormLabel>
+              <AutoResizeTextarea
+                id="content"
+                borderColor="teal.500"
+                focusBorderColor="teal.500"
+                size="lg"
+                {...register("content", {
+                  required: "This is required",
+                })}
+              />
+              <FormErrorMessage>
+                {errors.content && errors.content.message}
+              </FormErrorMessage>
+            </FormControl>
+            <FormControl isInvalid={!!errors.updated}>
+              <FormLabel>作成・更新日時</FormLabel>
+              <Input
+                type="datetime-local"
+                borderColor="teal.500"
+                focusBorderColor="teal.500"
+                {...register("updated", {
+                  required: "This is required",
+                })}
+              />
+              <FormErrorMessage>
+                {errors.updated && errors.updated.message}
+              </FormErrorMessage>
+            </FormControl>
+          </ModalBody>
+
+          <ModalFooter>
+            <Button
+              colorScheme="teal"
+              mr={3}
+              isLoading={isSubmitting}
+              type="submit"
+            >
+              Save
+            </Button>
+            <Button onClick={onClose}>Cancel</Button>
+          </ModalFooter>
+        </form>
+      </ModalContent>
+    </Modal>
+  );
+};
